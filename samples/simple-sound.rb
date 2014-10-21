@@ -1,30 +1,35 @@
 Shoes.app do
 
-  boing     = sound("./samples/sounds/61847__simon-rue__boink-v3.wav")
-  fog_horn  = sound("./samples/sounds/145622__andybrannan__train-fog-horn-long-wyomming.aiff")
-  explosion = sound("./samples/sounds/102719__sarge4267__explosion.mp3")
-  shields   = sound("./samples/sounds/46492__phreaksaccount__shields1.ogg")
+  @supremacy = sound("https://docs.google.com/file/d/0B6wEtK9O5dmfRWlzbUlTRlZCdEU/edit")
+  #@don_omar = sound("https://www.dropbox.com/s/uscefzorf4ebsvc/Don%20Omar%20ft.%20Tego%20Calderon%20-%20Bandolero.mp3")
 
-  # Set up three buttons
-  button "Boing WAV (740ms)" do
-    puts "Boing clicked"
-    boing.play
+  @last_song = @supremacy
+
+  button "PLAY" do
+    @last_song.play
   end
 
-  @two = button "Fog Horn AIFF (18.667s)" do
-    puts "Fog Horn clicked"
-    fog_horn.play
+  button "PAUSE" do
+    @last_song.pause
   end
 
-  button "Explosion MP3 (4.800s)" do
-    puts "Explosion clicked"
-    explosion.play
+  button "STOP" do
+    @last_song.stop
   end
 
-  button "Shields UP! OGG (2.473s)" do
-    puts "Shields clicked"
-    shields.play
+  button "RESUME" do
+    @last_song.resume
+
   end
 
+  button "Supremacy" do
+    @last_song.stop
+    @last_song = @supremacy
+  end
+
+  button "Perreo" do
+    @last_song.stop
+    @last_song = @don_omar
+  end
 
 end

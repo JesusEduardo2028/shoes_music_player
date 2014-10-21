@@ -1,5 +1,4 @@
 # JavaZOOM Sound-API Projects
-#  - Shared lib
 require 'shoes/swt/support/tritonus_share.jar'
 #  - MP3 lib
 require 'shoes/swt/support/mp3spi1.9.5.jar'
@@ -9,111 +8,138 @@ require 'shoes/swt/support/jogg-0.0.7.jar'
 require 'shoes/swt/support/jorbis-0.0.15.jar'
 require 'shoes/swt/support/vorbisspi1.0.3.jar'
 
+require 'shoes/swt/support/basicplayer3.0.jar'
+require 'shoes/swt/support/commons-logging-api.jar'
+require 'shoes/swt/support/jflac-1.2.jar'
+require 'shoes/swt/support/jl1.0.jar'
+require 'java'
+
+java_import "javazoom.jlgui.basicplayer.BasicController"
+java_import "javazoom.jlgui.basicplayer.BasicPlayer"
+java_import "javazoom.jlgui.basicplayer.BasicPlayerEvent"
+java_import "javazoom.jlgui.basicplayer.BasicPlayerException"
+java_import "javazoom.jlgui.basicplayer.BasicPlayerListener"
+
+
+
 class Shoes
   module Swt
     class Sound
-      JFile = java.io.File
-      import java.io.BufferedInputStream
-      import javax.sound.sampled
-      import java.io.IOException
 
-      BufferSize = 4096
+      java_implements BasicPlayerListener
+      java_signature 'void opened(Object, Map)'
+      java_signature 'void progress(int,long, byte[] , Map )'
+      java_signature 'void stateUpdated(BasicPlayerEvent)'
+      java_signature 'void setController(BasicPlayerEvent)'
+
+      JFile = java.io.File
+
+      attr_reader :progressNow
 
       def initialize(dsl)
-        @dsl = dsl
+        @basicPlayer = BasicPlayer.new;
+        @basicPlayer.addBasicPlayerListener(self);
+        @bytesLength = nil
+        @progressNow = {seconds: "00", minutes: "00", hours: "00"}
+        loadFile(dsl.filepath)
       end
-
-      def filepath
-        @dsl.filepath
-      end
-
-      attr_accessor :mixer_channel, :audio_input_stream, :audio_format
 
       def play
-        Thread.new do
-          begin
-            sound_file = JFile.new(self.filepath)
-
-            audio_input_stream = AudioSystem.getAudioInputStream(sound_file)
-            audio_format = audio_input_stream.getFormat
-
-            decoded_audio_format, decoded_audio_input_stream = decode_input_stream(audio_format, audio_input_stream)
-
-            # Play now.
-            rawplay(decoded_audio_format, decoded_audio_input_stream)
-            audio_input_stream.close
-
-          rescue UnsupportedAudioFileException => uafex
-            puts uafex.inspect, uafex.backtrace
-          rescue IOException => ioex
-            puts ioex.inspect, ioex.backtrace
-              #rescue JIOException => jioex
-              #  jioex.stacktrace
-          rescue LineUnavailableException => luex
-            puts luex.inspect, luex.backtrace
-          rescue Exception => e
-            puts e.inspect, e.backtrace
-          end
+        begin
+          @basicPlayer.play
+        rescue Exception => e
+          puts e
         end
       end
 
-      def decode_input_stream(audio_format, audio_input_stream)
-        case audio_format.encoding
-          when Java::JavazoomSpiVorbisSampledFile::VorbisEncoding, Java::JavazoomSpiMpegSampledFile::MpegEncoding
-            decoded_format = AudioFormat.new(AudioFormat::Encoding::PCM_SIGNED,
-                                             audio_format.getSampleRate(),
-                                             16,
-                                             audio_format.getChannels(),
-                                             audio_format.getChannels() * 2,
-                                             audio_format.getSampleRate(),
-                                             false)
-            decoded_audio_input_stream = AudioSystem.getAudioInputStream(decoded_format, audio_input_stream)
-
-            return decoded_format, decoded_audio_input_stream
-
+      def toggle_play
+        begin
+          if @basicPlayer.getStatus > 1  
+            @basicPlayer.play
           else
-            return audio_format, audio_input_stream
-        end
-      end
-
-      def rawplay(decoded_audio_format, decoded_audio_input_stream)
-
-        #throws IOException, LineUnavailableException
-
-        sampled_data = Java::byte[BufferSize].new
-
-        line = getLine(decoded_audio_format)
-        if line != nil
-
-          # Start
-          line.start()
-          bytes_read = 0, bytes_written = 0
-          while bytes_read != -1
-
-            bytes_read = decoded_audio_input_stream.read(sampled_data, 0, sampled_data.length)
-            if bytes_read != -1
-
-              bytes_written = line.write(sampled_data, 0, bytes_read)
+            if isPaused
+              @basicPlayer.resume
+            else
+              @basicPlayer.pause
             end
           end
-          # Stop
-          line.drain()
-          line.stop()
-          line.close()
-          decoded_audio_input_stream.close()
+        rescue Exception => e
+          puts e
         end
       end
 
-      def getLine(audioFormat)
+      def pause
+        begin
+          @basicPlayer.pause
+        rescue Exception => e
+          puts e
+        end
+      end
 
-        #throws LineUnavailableException
+      def stop
+        begin
+          @basicPlayer.stop
+          @progressNow = {seconds: "00", minutes: "00", hours: "00"}
+        rescue Exception => e
+          puts e
+        end
+      end
 
-        res = nil
-        info = DataLine::Info.new(SourceDataLine.java_class, audioFormat)
-        res = AudioSystem.getLine(info)
-        res.open(audioFormat)
-        res
+      def resume
+        begin
+          @basicPlayer.resume
+        rescue Exception => e
+          puts e
+        end
+      end
+
+      def status
+        @basicPlayer.getStatus
+      end
+
+      def isPlaying
+         @basicPlayer.getStatus == 0
+      end
+
+      def isPaused
+         @basicPlayer.getStatus == 1
+      end
+
+      def isStopped
+        @basicPlayer.getStatus > 1
+      end
+
+      def loadFile(file_url)
+        #@basicPlayer.open(java.net.URL.new(file_url))
+        @basicPlayer.open(JFile.new(file_url))
+      end
+
+      def opened(arg0 , arg1) 
+        if (arg1.containsKey("audio.length.bytes")) 
+          @bytesLength = arg1.get("audio.length.bytes")
+          puts "Longitud en bytes #{@bytesLength}"
+        end
+      end
+
+      def progress(bytesread,microseconds,pcmdata, properties) 
+        progress_time = microseconds / 1000000
+        seconds = progress_time % 60
+        progress_time /= 60
+        minutes = progress_time % 60
+        progress_time /= 60
+        hours = progress_time % 24
+
+        @progressNow = {seconds: seconds.to_s.rjust(2, '0') , minutes: minutes.to_s.rjust(2, '0') , hours: hours.to_s.rjust(2, '0') }
+      end
+
+      def setController(arg0) 
+
+      end
+
+      def stateUpdated(arg0)
+
       end
     end
   end
+
 end
